@@ -1,0 +1,41 @@
+#!/bin/env bash
+
+# Blocklet shows the amount of time I spent studying today.
+# If there is ongoing study session currently active, it will
+# display it's duration as well.
+
+# Clicking behaviour: if study is active, cancel it, otherwise continue it.
+
+# TODO: Add clicking commands. <13-08-20, Maks Kamnikar> #
+# case $BLOCK_BUTTON in
+#     # Left click.
+#     1) notify-send -t 5000 "Study-timew" "$(timew continue)"
+
+# Firstly check if there was any studying done today at all.
+if [[ "1" == "$(timew summary faks | wc -l)" ]]; then
+    # No studying has been done today yet.
+    # If it were, there'd be at least 7 lines
+    echo "ZERO"
+    exit 0
+else
+    # Get todays study time.
+    # Keep only the relevant line and clean it of whitespace. We also dont need seconds.
+
+    # Clear unneeded 0.
+    STUDY_TIME="$(timew summary faks | tail -2 | head -1 | sed 's/\s//g' | cut -d: -f -2 | sed 's/:0/:/')"
+
+    # Time of ongoing study session.
+    ONGOING_TIME=""
+    # TODO: This matches any tracking, not just tag 'faks'. Correct it! <13-07-20, Maks Kamnikar> #
+    if [[ 1 -eq $(timew get dom.active) ]]; then
+        ONGOING_TIME="($(timew get dom.active.duration | cut -dT -f 2 | cut -dM -f 1 | sed 's/H/:/'))"
+        # Clean errors: if less than a minute it has to be cleaned up.
+        if [[ -n "$(echo $ONGOING_TIME | grep S)" ]]; then
+            ONGOING_TIME="(0)"
+        fi
+    fi
+    printf "%s " "$STUDY_TIME"
+    printf "%s" "$ONGOING_TIME"
+    echo
+    exit 0
+fi

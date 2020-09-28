@@ -1,0 +1,26 @@
+#!/bin/env bash
+
+# Laptop screen brightness control blocklet.
+# depends on light - get it on github.
+
+# Stored in /usr/share/i3blocks
+
+
+case $BLOCK_BUTTON in
+    1) light -A 10 ;; # Left click.
+    3) light -U 10 ;; # Right click.
+    4) light -A 10 ;; # Scroll up.
+    5) light -U 10 ;; # Scroll down.
+esac
+# Display brightness from 0 to 100.
+CURRENT_BRIGHTNESS=$(light) # Formatted '\d\d\d\?\.\d\d'
+
+# Output (blocklet text).
+if [[ "$CURRENT_BRIGHTNESS" == "0.10" ]]; then
+    echo MIN
+    exit 0
+elif [[ "$CURRENT_BRIGHTNESS" == "100.00" ]]; then
+    echo MAX
+    exit 0
+fi
+echo "$(echo "$CURRENT_BRIGHTNESS" | cut -d'.' -f 1)%"

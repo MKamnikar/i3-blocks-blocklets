@@ -1,0 +1,12 @@
+#!/bin/env sh
+
+# Blocklet shows datetime and upon click shows some calendar functionality.
+
+# Main command - shows: day, DD.MM.YYYY - hh.mm.ss
+STRING=$(date +'%a, %d.%m.%Y - %T')
+
+case $BLOCK_BUTTON in
+    1) python3 /usr/share/i3blocks/helper_datetime ;;
+esac
+
+echo "$STRING"

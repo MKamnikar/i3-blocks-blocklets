@@ -1,0 +1,36 @@
+#!/bin/env bash
+
+# Echoes some number,
+# right click resets to reduces by 1,
+# left click resets to increments by 1,
+# middle click resets to 0.
+
+# Used for i3-blocks blocklet, but can be also called
+# from a terminal to increment the value, because using
+# the mouse is an antipattern.
+
+# Current value is stored in a .log file.
+NUMBER=$(cat ~/Documents/.logs/counter.log)
+
+# If called from terminal.
+if [[ -n $1 ]]; then
+    if [[ $1 == "plus" ]] || [[ $1 == "+" ]]; then
+        # increment
+        NUMBER=$((NUMBER + 1)) && echo $NUMBER > ~/Documents/.logs/counter.log
+    elif [[ $1 == "minus" ]] || [[ $1 == "-" ]]; then
+        # decrement
+        NUMBER=$((NUMBER - 1)) && echo $NUMBER > ~/Documents/.logs/counter.log
+    elif [[ $1 == "reset" ]]; then
+        NUMBER=0 && echo $NUMBER > ~/Documents/.logs/counter.log
+    fi
+fi
+
+# If clicking on the blocklet with the mouse.
+case $BLOCK_BUTTON in
+    1) NUMBER=$((NUMBER + 1)) && echo $NUMBER > ~/Documents/.logs/counter.log ;;
+    2) NUMBER=0 && echo $NUMBER > ~/Documents/.logs/counter.log ;;
+    3) NUMBER=$((NUMBER - 1)) && echo $NUMBER > ~/Documents/.logs/counter.log ;;
+esac
+
+echo $NUMBER
+pkill -RTMIN+2 i3blocks

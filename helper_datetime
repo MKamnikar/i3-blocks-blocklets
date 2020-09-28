@@ -1,0 +1,359 @@
+#!/usr/bin/env python3
+
+import calendar
+import datetime
+import re
+import os
+from pathlib import Path
+
+# TODO: make a readme guide which chars can be where <26-05-19, Maks Kamnikar> #
+# TODO: Google calendar integration <26-05-19, Maks Kamnikar> #
+
+# Stored in /usr/share/i3blocks
+
+
+def make_paragraph_of_section(prefix, text):
+    """Acceps prefix of section subsection and tasks text and
+    returns nicely formatted subsection."""
+
+    return_string = ''
+
+    if len(prefix + text[0]) > 46:
+        return_string += prefix + "\n"
+        prefix = "1234"  # For indentation
+        return_string += len(prefix)*' ' + text[0] + '\n'
+    else:
+        return_string += prefix + text[0] + '\n'
+
+    if len(text) > 1:
+        for i in range(1, len(text)):
+            return_string += ' '*len(prefix) + text[i] + '\n'
+
+    return return_string
+
+
+class Task():
+    """Has values date, time, place and tag.
+       Stores value for if task is due this week, this day.
+    """
+
+    def __init__(self, meta, text):
+        """sets values self.date
+                       self.time
+                       self.place
+                       self.tag
+                       self.this_week
+                       self.this_day
+                if applicable,
+                and formats body of the task (text) nicely
+        """
+        # Meta if only the first line of each task paragraph
+        # It contains data about the task
+        # DATE
+        date_match = re.search(r'\d\d\.\d\d\.\d\d\d\d', meta)  # Big endian
+        if date_match:
+            date_list = date_match.group(0).split('.')  # Remove ' ::'
+            due_date = datetime.date(int(date_list[2]), int(date_list[1]), int(date_list[0]))  # Big endian date format
+            self.date = due_date
+        else:
+            # TODO: throw error <26-05-19, Maks Kamnikar> #
+            pass
+        # TIME
+        time_match = re.search(r'\d{4}-\d{4}|WHOLE-DAY', meta)  # If this is not specific enough, you are the problem.
+        if time_match:
+            self.time = time_match.group(0)
+        else:
+            self.time = False
+        # PLACE
+        place_match = re.search(r'(?<=@ ).+ ::', meta)
+        if place_match:
+            self.place = place_match.group(0)[:-3]  # Remove ' ::'
+        else:
+            self.place = False
+        # TAG
+        tag_match = re.search(r'(?<=:: )[\w\s-]+$', meta)
+        if tag_match:
+            self.tag = tag_match.group(0)
+        else:
+            # TODO: throw error <26-05-19, Maks Kamnikar> #
+            pass
+        # TODO: make a readme guide which chars can be where <26-05-19, Maks Kamnikar> #
+        # Tags consist of whitespace, letters and dashes
+
+        # Body of task (text)
+        # Text is a list of strings
+        new_text = [re.sub(r'^\s*', '', i) for i in text]  # List of strings without starting whitespace
+        self.text = new_text
+
+        self.today = (due_date == datetime.date.today())
+        self.this_week = (due_date.isocalendar()[1] == datetime.date.today().isocalendar()[1])
+
+    def section_today_string(self):
+        """Returns nicely formatted string that would go into section: TODAY"""
+
+        prefix = ''
+        if self.time and self.place:  # Time and place are known.
+            prefix = ' {} @ {} :: '.format(self.time, self.place)
+
+        elif self.time and not self.place:  # Only time is known.
+            prefix = ' {} :: '.format(self.time)
+
+        elif not self.time and self.place:  # Only place is known.
+            prefix = ' @ {} :: '.format(self.place)
+
+        elif not self.time and not self.place:  # Neither time not place are known.
+            prefix = ' :: '
+
+        return make_paragraph_of_section(prefix, self.text)
+
+    def section_week_string(self):
+        """Returns nicely formatted string that would go into section: WEEK."""
+
+        prefix = ''
+        if self.time and self.place:  # Time and place are known.
+            prefix = ' {} : {} @ {} :: '.format(self.date.strftime('%a -%d').upper(), self.time, self.place)
+
+        elif self.time and not self.place:  # Only time is known.
+            prefix = ' {} : {} :: '.format(self.date.strftime('%a -%d').upper(), self.time)
+
+        elif not self.time and self.place:  # Only place is known.
+            prefix = ' {} @ {} :: '.format(self.date.strftime('%a -%d').upper(), self.place)
+
+        elif not self.time and not self.place:  # Neither time nor place are known.
+            prefix = ' {} : '.format(self.date.strftime('%a -%d').upper())
+
+        return make_paragraph_of_section(prefix, self.text)
+
+    def section_other_string(self):
+        """Returns nicely formatted string that would go into section: OTHER."""
+
+        prefix = ''
+        if self.time and self.place:  # Time and place are known.
+            prefix = ' {} {} @ {} : '.format(self.date.strftime("%d.%m.%y"), self.time, self.place)
+            # prefix = ' {} {} @ {} : '.format(str(self.date), self.time, self.place)  # ISO 8601
+
+        elif self.time and not self.place:  # Only time is known.
+            prefix = ' {} {} : '.format(self.date.strftime("%d.%m.%y"), self.time)
+            # prefix = ' {} {} : '.format(str(self.date), self.time)  # ISO 8601
+
+        elif not self.time and self.place:  # Only place is known.
+            prefix = ' {} @ {} : '.format(self.date.strftime("%d.%m.%y"), self.place)
+            # prefix = ' {} @ {} : '.format(str(self.date), self.place)  # ISO 8601
+
+        elif not self.time and not self.place:  # Neither time not place are known.
+            prefix = ' {} : '.format(self.date.strftime("%d.%m.%y"))
+            # prefix = ' {} : '.format(str(self.date))  # ISO 8601
+
+        return make_paragraph_of_section(prefix, self.text)
+
+    def section_urgent_string(self):
+        """Returns nicely formatted string that would go into section: URGENT."""
+
+        prefix = ''
+        if self.time and self.place:  # Time and place are known.
+            prefix = ' {}: {} @ {} : '.format(self.date.strftime("%a-%d.%m.%y"), self.time, self.place)
+            # prefix = ' {}: {}@{} : '.format(self.date.strftime("%a-%Y.%m.%d"), self.time, self.place)  # ISO 8601
+
+        elif self.time and not self.place:  # Only time is known.
+            prefix = ' {}: {} : '.format(self.date.strftime("%a-%d.%m.%y"), self.time)
+            # prefix = ' {}: {} : '.format(self.date.strftime("%a-%Y.%m.%d"), self.time)  # ISO 8601
+
+        elif not self.time and self.place:  # Only place is known.
+            prefix = ' {}@ {} : '.format(self.date.strftime("%a-%d.%m.%y"), self.place)
+            # prefix = ' {}@{} : '.format(self.date.strftime("%a-%Y.%m.%d"), self.place)  # ISO 8601
+
+        elif not self.time and not self.place:  # Neither time not place are known
+            prefix = ' {} : '.format(self.date.strftime("%a-%d.%m.%y"))
+            # prefix = ' {} : '.format(self.date.strftime("%a-%Y.%m.%d"))  # ISO 8601
+
+        return make_paragraph_of_section(prefix, self.text)
+
+
+def read_file_create_classes():
+    """opens .calendar file and parses it:
+       Each paragraph is its own task.
+       Split each paragraph by newlines and make a class Task(first-line, list(all-other-lines))
+
+       Returns list full of Task class objects
+    """
+    # Works on any home dir, not just my name.
+    calendar_file = str(Path('~').expanduser()) + '/Documents/Calendar/timetable.calendar'
+    list_of_task_classes = []
+    with open(calendar_file, 'r') as dat:
+        tmp_lst = []
+        for line in dat:
+            if '/*' not in line:
+                if len(line) != 1:
+                    tmp_lst.append(line[:-1])  # Remove newline character at the end.
+                else:  # Empty line (only contains a newline.
+                    if tmp_lst:  # If not empty.
+                        list_of_task_classes.append(Task(tmp_lst.pop(0), tmp_lst))
+                    tmp_lst = []  # Empty temp list.
+                    # NOTE: last line in .calendar has to be empty line otherwise last paragraph doesn't get added <26-05-19, Maks Kamnikar> #
+
+    return list_of_task_classes
+
+
+def make_string_for_stdout(list_of_task_classes):  # Gets command line args.
+    # TODO: add cmd line args <26-05-19, Maks Kamnikar> #
+    """Gets list_of_task_classes for input:
+        They have nicely ordered data.
+        Also gets command line arguments regarding how and what to print.
+        # TODO: Which command line arguments? add them! <26-05-19, Maks Kamnikar> #
+                width, indentation, print_today_section, print_week_section, print_other_section, print_urgent_section
+                # maybe some others
+
+        Returns nicely formated text calendar
+        which has current date marked as well as days with any tasks.
+        Markings next to days depend of tags.
+    """
+
+    def pretty_calendar(list_of_task_classes, width, indentation):
+        """Takes args list_of_task_classes
+           and width: how much whitespace surrounds each day in the string
+           and indentation: how far right the calendar is indented
+
+           Returns text based calendar with todays date marked
+           and days with any tasks are also marked.
+           """
+
+        tag_prefix = {  # This is added next to day number before the number
+                        # Prefixes should not be numbers
+            'faks'                : ' ',
+            'general'             : ' ',
+            'general-important'   : ' ',
+            'general-unimportant' : ' ',
+            'important'           : ' ',
+            'school'              : ' ',
+            'uni'                 : ' ',
+            'unimportant'         : ' ',
+            'urgent'              : '!',
+            'izpit'               : ' ',
+            'kolokvij'            : ' ',
+            'ustni'               : ' ',
+            'ustni-izpit'         : ' ',
+                      }
+
+        tag_suffix = {  # This is added next to day number after the number
+                        # Suffixes should not be numbers
+            'faks'                : 'F',
+            'general'             : '.',
+            'general-important'   : '!',
+            'general-unimportant' : '.',
+            'important'           : '!',
+            'school'              : 'S',
+            'uni'                 : 'F',
+            'unimportant'         : '.',
+            'urgent'              : '!',
+            'izpit'               : 'F',
+            'kolokvij'            : 'F',
+            'ustni'               : 'F',
+            'ustni-izpit'         : 'F',
+            }
+
+        # Nice calendar                                  week starts on monday         year                        month                        width
+        original_calendar_string = calendar.TextCalendar(firstweekday=0).formatmonth(datetime.date.today().year, datetime.date.today().month, width)
+        return_string = re.sub('\n', ' \n', original_calendar_string, 0, 0)
+
+        # Add tags next to days.
+        for task in list_of_task_classes:
+            if task.date.month == datetime.date.today().month and task.date.year == datetime.date.today().year:  # If task due this month
+                return_string = re.sub(r'\D{}\D'.format(task.date.day), '{}{}{}'.format(tag_prefix[task.tag], task.date.day, tag_suffix[task.tag]), return_string)
+
+        # Mark todays date: surrounds it with '[' and ']'.
+        return_string = re.sub(r'\D{}\D'.format(datetime.date.today().day), '[{}]'.format(datetime.date.today().day), return_string)
+
+        # Indent each line for 'indentation'.
+        return_string = indentation * ' ' + re.sub('\n', '\n{}'.format(indentation * ' '), return_string, 0)
+
+        return return_string
+
+    # These should be inputs to the function.
+    # TODO: Command line args to choose these values <17-10-19, Maks Kamnikar> #
+    print_today_section  = False
+    print_week_section   = False
+    print_other_section  = False
+    print_urgent_section = False
+    width       = 4
+    indentation = 6
+
+    # Add markings to the pretty calendar.
+    return_string = pretty_calendar(list_of_task_classes, width, indentation)
+
+    # Sections contain only still relevant tasks.
+    list_of_tasks_after_yesterday = [task for task in list_of_task_classes if task.date >= datetime.date.today()]
+
+    # Dont make empty sections.
+    for task in list_of_tasks_after_yesterday:
+        if task.today:
+            print_today_section = True
+        if not task.today and task.this_week:
+            print_week_section = True
+        if not task.today and not task.this_week:  # Only after today.
+            print_other_section = True
+        if task.tag in ['faks', 'school', 'uni', 'urgent', 'izpit', 'kolokvij', 'ustni', 'ustni-izpit']:
+            print_urgent_section = True  # TODO: should not just be True no matter what <17-10-19, Maks Kamnikar> #
+                                         # should be decided with command line args
+
+    # Make section: TODAY
+    if print_today_section:
+        return_string += '\nTODAY {}:\n'.format(datetime.date.today().strftime('%A %d.%m.%Y'))
+        list_of_todays_tasks = []
+        for task in list_of_tasks_after_yesterday:
+            if task.today:
+                if task.time:
+                    list_of_todays_tasks.append(task)
+                # return_string += task.section_today_string() # MODIFIED
+
+    # Sort todays tasks by time if there happen to be any tasks today.
+    if print_today_section:  # print_today_section is True when there are tasks today.
+        list_of_todays_tasks.sort(key=lambda x: x.time)
+
+        # Append todays tasks without time.
+        for task in list_of_tasks_after_yesterday:
+            if task.today and not task.time:
+                list_of_todays_tasks.append(task)
+
+        # Finally add todays tasks to output string ordered by time of applicable.
+        for task in list_of_todays_tasks:
+            return_string += task.section_today_string()
+
+    # Make section: WEEK
+    if print_week_section:
+        return_string += '\nTHIS WEEK ({}):\n'.format(datetime.date.today().isocalendar()[1])
+        for task in list_of_tasks_after_yesterday:
+            if task.this_week:
+                return_string += task.section_week_string()
+
+    # Make section: OTHER
+    if print_other_section:
+        return_string += '\nOTHER:\n'
+        for task in list_of_tasks_after_yesterday:
+            if not task.today and not task.this_week:  # Only after today.
+                return_string += task.section_other_string()
+
+    # Make section: URGENT
+    urgent_string = '\nURGENT:\n'
+    for task in list_of_tasks_after_yesterday:
+        if task.tag in ['faks', 'school', 'uni', 'urgent', 'izpit', 'kolokvij', 'ustni', 'ustni-izpit']:
+            urgent_string += task.section_urgent_string().upper()
+
+    # TODO: uredi ta del <01-12-19, Maks Kamnikar> #
+    # if print_urgent_section:
+    #     return_string += urgent_string
+
+    return (return_string, urgent_string)
+
+
+# TODO: add cmd line args <26-05-19, Maks Kamnikar> #
+
+general_and_urgent_tuple = make_string_for_stdout(read_file_create_classes())
+general_string = general_and_urgent_tuple[0]
+urgent_string = general_and_urgent_tuple[1]
+urgent_string = '\n'.join(urgent_string.split('\n')[2:])
+
+if urgent_string:
+    os.system('notify-send -u critical -t 0 "{}URGENT" "{}"'.format(' '*20, urgent_string))
+
+# General info: Should be below so it is newer and appears on top or urgent.
+os.system('notify-send -t 0 "{}Calendar" "{}"'.format(' '*19, general_string))

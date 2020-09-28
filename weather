@@ -1,0 +1,35 @@
+#!/bin/env bash
+
+# i3blocklet that prints current temperature and responds to clicks.
+
+# Left-click shows current weather.
+# Right-click shows extended weather forecast.
+
+# Normally stored in /usr/share/i3blocks
+
+# Get weather info.
+WEATHER=$(curl -Ss 'https://wttr.in?0TQm')
+
+# Modify info to fit dunst notification popup window.
+BLOCK_TEXT=$(echo "$WEATHER" | cut -c 16- | head -2 | tail -1 | sed 's/C.*$/C/')
+
+case $BLOCK_BUTTON in
+    # Left-click: Shows current weather in dunst notification popup.
+    1) notify-send -t 6000 "Current Weather" "$WEATHER" ;;
+
+    # Right-click: Opens last available .gif file of weather radar.
+    # Title is set so i3 can handle mpv container in a specific way.
+    # Refer to ~/.config/i3/config for clarification.
+    3) mpv --loop --title="mpv-meteo" --no-border http://meteo.arso.gov.si/uploads/probase/www/observ/radar/si0-rm-anim.gif 1> /dev/null ;;
+esac
+
+# Further modify info to fit in a i3-blocks blocklet. (Displays only current temperature.)
+BLOCK_TEXT=$(echo "$BLOCK_TEXT" | cut -c -15)
+
+# Handle errors gracefully. It happens every now and then that wttr.in server
+# can't respond to all the requests it gets.
+if [[ -z "$BLOCK_TEXT" ]]; then
+    echo "ERROR"
+else
+    echo "$BLOCK_TEXT"
+fi

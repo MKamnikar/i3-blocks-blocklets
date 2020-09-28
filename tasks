@@ -1,0 +1,20 @@
+#!/bin/env zsh
+
+# Blocket for displaying number of tasks in ~/Documents/Tasks
+# Depends on renew-todo-lists script in path.
+
+# Normally stored in /usr/share/i3blocks
+
+case $BLOCK_BUTTON in
+    1) renew-todo-lists && notify-send -t 0 "Today's tasks (t)" "$(cat ~/Documents/Tasks/$(date +%F) | grep -v '#' | grep -v '/\*.\+\*/' | sed 's/^\*\*\+/#/' )" ;;
+    3) notify-send -t 0 "Last note (ln)" "$(cat $(ls -1 ~/Documents/Notes/* | tail -1) )" ;;
+esac
+
+NUMBER=$(cat ~/Documents/Tasks/$(date '+%F') | grep -v '#' | grep -v '^ *$' | grep -v "/\*.\+\*/" | wc -l)
+
+echo "$NUMBER"
+
+if [[ "$NUMBER" == "0" ]]
+then
+    renew-todo-lists
+fi
